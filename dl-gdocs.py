@@ -1,26 +1,29 @@
 #!/usr/bin/python
-
 """
 Downloads all your Google documents (text, presentation, spreadsheets) 
 
-Feed and pull requests welcome on github: http://github.com/monperrus/dl-gdocs
+You can leave a comment below
 
+URL: https://github.com/monperrus/dl-gdocs/
 Author: Martin Monperrus
-Date: April 2015
+Date: April 2015 (still working on Sep 2019)
 Licence: MIT
 """
 
 ## CONSTANTS
-GOOGLE_CREDENTIALS_FILE = 'google-credentials.json'
+# this file is created automatically
+# if errors remove it: "rm google-credentials.json"
+GOOGLE_CREDENTIALS_FILE = 'google-credentials-dl-gdocs.json'
 
 # dependencies
 import json
 import httplib2
 import re
 import os
+import iso8601
+import datetime
 from oauth2client.client import OAuth2WebServerFlow
 from oauth2client.file import Storage
-from jsonpath_rw import jsonpath, parse
   
 
 def get_credential_oauth():
@@ -29,9 +32,9 @@ def get_credential_oauth():
   # the application id: 
   # if this one gets blocked (by Google or myself)
   # you may create your own at https://console.developers.google.com/
-  # menu APIs & Auth >> APIs: enable Drive API
-  # menu APIs & Auth >> credentials >> Create New Client ID >> Installed application >> Other
-  client_secrets = json.loads('{"installed":{"auth_uri":"https://accounts.google.com/o/oauth2/auth","client_secret":"tB6CKB-KcegkcUONYZqKQw1j","token_uri":"https://accounts.google.com/o/oauth2/token","client_email":"","redirect_uris":["urn:ietf:wg:oauth:2.0:oob","oob"],"client_x509_cert_url":"","client_id":"879219052242-anuu8p1or7c3ju6hv7fu426vkk1rf27k.apps.googleusercontent.com","auth_provider_x509_cert_url":"https://www.googleapis.com/oauth2/v1/certs"}}')
+  # project dl-gdocs
+  # credentials >> Create New Client ID >> Installed application >> Other
+  client_secrets = json.loads(open('/home/martin/client_secret_879219052242-anuu8p1or7c3ju6hv7fu426vkk1rf27k.apps.googleusercontent.com.json').read())
 
   #  flow = flow_from_clientsecrets('google.json', scope='',  redirect_uri='urn:ietf:wg:oauth:2.0:oob')
   
@@ -48,12 +51,9 @@ def get_credential_oauth():
 
   print("Please input the authentication code here:")
   code = raw_input("code?")
-
   credentials = flow.step2_exchange(code)
-
   storage = Storage(GOOGLE_CREDENTIALS_FILE)
   storage.put(credentials)
-
   return credentials
 
 def get_credential():
@@ -73,22 +73,22 @@ def download_gdocs(doc_mime_type, export_mime_type):
   credentials = get_credential()
   http = credentials.authorize(http)
   content={"nextLink":"https://www.googleapis.com/drive/v2/files/?q=mimeType='"+doc_mime_type+"'"}
+  i=0
   while "nextLink" in content:
+    i+=1
+    #if i>2: break # used for debug
     resp, content = http.request(content["nextLink"], "GET")
     content = json.loads(content)
     items = content['items']
-    export_urls = get_list_export_urls(items, export_mime_type)
-    download_all_files(export_urls)
+    # formatted RFC 3339 timestamp
+    for item in items:
+        delta = datetime.datetime.today()-iso8601.parse_date(item['modifiedDate']).replace(tzinfo=None)
+        if delta.days < 365: # only download the recently modified files
+            # download it
+            link = item['exportLinks'][export_mime_type]
+            print(delta, link)
+            download_file(link)
 
-
-def get_list_export_urls(jsobj, export_mime_type):
-  """ returns the list of export urls from the JSON object passed as parameter"""
-  jsonpath_expr = parse("$[*].exportLinks['"+export_mime_type+"']")
-  return [match.value for match in jsonpath_expr.find(jsobj)]
- 
-def download_all_files(url_list):
-  for export_url in url_list:
-    download_file(export_url)
     
 def download_file(export_url):
   """ downloads the google document from this export URL.
