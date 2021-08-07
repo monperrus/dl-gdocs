@@ -2,11 +2,10 @@
 """
 Downloads all your Google documents (text, presentation, spreadsheets) 
 
-You can leave a comment below
-
 URL: https://github.com/monperrus/dl-gdocs/
 Author: Martin Monperrus
-Date: April 2015 (still working on Sep 2019)
+Creation Date: April 2015 
+Still working on August 2021
 Licence: MIT
 """
 
