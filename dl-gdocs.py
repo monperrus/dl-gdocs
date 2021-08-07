@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/python3
 """
 Downloads all your Google documents (text, presentation, spreadsheets) 
 
@@ -24,7 +24,7 @@ import iso8601
 import datetime
 from oauth2client.client import OAuth2WebServerFlow
 from oauth2client.file import Storage
-  
+import time  
 
 def get_credential_oauth():
   """ returns a credential object from the Google OAuth webservice"""
@@ -50,7 +50,7 @@ def get_credential_oauth():
   print(auth_uri)
 
   print("Please input the authentication code here:")
-  code = raw_input("code?")
+  code = input("code?")
   credentials = flow.step2_exchange(code)
   storage = Storage(GOOGLE_CREDENTIALS_FILE)
   storage.put(credentials)
@@ -82,15 +82,17 @@ def download_gdocs(doc_mime_type, export_mime_type):
     items = content['items']
     # formatted RFC 3339 timestamp
     for item in items:
-        delta = datetime.datetime.today()-iso8601.parse_date(item['modifiedDate']).replace(tzinfo=None)
-        if delta.days < 365: # only download the recently modified files
+        mdate = iso8601.parse_date(item['modifiedDate'])
+        delta = datetime.datetime.today()-mdate.replace(tzinfo=None)
+        if delta.days < 720: # only download the recently modified files
             # download it
             link = item['exportLinks'][export_mime_type]
+            # changes in item.keys()
             print(delta, link)
-            download_file(link)
+            download_file(link, time.mktime(mdate.timetuple()))
 
     
-def download_file(export_url):
+def download_file(export_url, modTime = 0):
   """ downloads the google document from this export URL.
   uses the file name given in the content-disposition HTTP header"""
   #print url
@@ -104,9 +106,10 @@ def download_file(export_url):
   match = re.match('.*"(.*?)".*', resp['content-disposition'])
   name = match.group(1)
   if (len(name)>140): name = name[:-140]
-  print "downloading",name
+  print("downloading",name)
   with open(name, 'wb') as f:
     f.write(content)
+    os.utime(name, (modTime, modTime))
 
 # for a list of Google Documents mime type, see https://developers.google.com/drive/web/mime-types
 # for opendocument mime types, see http://en.wikipedia.org/wiki/OpenDocument_technical_specification
